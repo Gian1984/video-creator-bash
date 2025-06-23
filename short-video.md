@@ -93,63 +93,69 @@ You can change:
 
 source ~/env-tts/bin/activate
 
-TEXT="3 gadget tech da meno di 30 euro che sembrano fantascienza!"
+TEXT="3 gadget tech da meno di 30 euro che sembrano fantascienza! Trovi il link Amazon in descrizione!"
 VOCE="voce.mp3"
 MUSICA="musica.mp3"
 IMAGES_DIR="./immagini"
 VIDEO="video.mp4"
 OUTPUT="short_finale.mp4"
 
-# Find images
+# Trova immagini
 shopt -s nullglob
 IMMAGINI=("$IMAGES_DIR"/slide*.jpg "$IMAGES_DIR"/slide*.png)
 shopt -u nullglob
 
 NUM_IMMAGINI=${#IMMAGINI[@]}
 if [ "$NUM_IMMAGINI" -lt 1 ]; then
-  echo "[❌] No images found in $IMAGES_DIR"
+  echo "[❌] Nessuna immagine trovata in $IMAGES_DIR"
   exit 1
 fi
-echo "[ℹ️] Found $NUM_IMMAGINI images."
+echo "[ℹ️] Trovate $NUM_IMMAGINI immagini."
 
-# Generate voice
-echo "[🎤] Generating voice..."
+# Genera voce
+echo "[🎤] Genero voce..."
 python3 -c "from gtts import gTTS; gTTS('$TEXT', lang='it').save('$VOCE')"
 
-# Get audio duration
+# Durata audio (limitata a max 30 sec per YouTube Shorts)
 DURATA=$(ffprobe -i "$VOCE" -show_entries format=duration -v quiet -of csv="p=0")
 DURATA=$(printf "%.0f" "$DURATA")
+DURATA=$(( DURATA < 25 ? 25 : DURATA > 30 ? 30 : DURATA ))
+
 DURATA_SLIDE=$(( DURATA / NUM_IMMAGINI ))
 RESTO=$(( DURATA % NUM_IMMAGINI ))
 
-echo "[⏱️] Audio duration: $DURATA sec"
+echo "[⏱️] Durata audio: $DURATA sec"
 
-# Create video from images
-echo "[🖼️] Creating video from images..."
+# Crea video da immagini con pad bianco + fade
+echo "[🖼️] Creo video da immagini..."
 FILTERS=""
 INPUTS=()
 for i in "${!IMMAGINI[@]}"; do
   DUR=$DURATA_SLIDE
   [ "$i" -eq 0 ] && DUR=$(( DUR + RESTO ))
   INPUTS+=(-loop 1 -t "$DUR" -i "${IMMAGINI[$i]}")
-  FILTERS+="[$i:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p[frame$i];"
+  FILTERS+="[$i:v]scale=1080:1920:force_original_aspect_ratio=decrease,\
+pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=white,\
+setsar=1,\
+format=yuv420p[frame$i];"
 done
 
 for i in $(seq 0 $((NUM_IMMAGINI - 1))); do
   FILTERS+="[frame$i]"
 done
-FILTERS+="concat=n=$NUM_IMMAGINI:v=1:a=0[outv]"
+FILTERS+="concat=n=$NUM_IMMAGINI:v=1:a=0[base];"
+FILTERS+="[base]fade=t=in:st=0:d=1,fade=t=out:st=$((DURATA - 1)):d=1[outv]"
 
 ffmpeg -y "${INPUTS[@]}" -filter_complex "$FILTERS" -map "[outv]" -c:v libx264 -pix_fmt yuv420p -r 30 "$VIDEO"
 
-# Mix voice and background music
-echo "[🎧] Mixing voice and music..."
-ffmpeg -y -i "$VOCE" -i "$MUSICA" -filter_complex "[1:a]volume=0.2[music];[0:a][music]amix=inputs=2:duration=first[aout]" \
--map "[aout]" -c:a aac audio_mix.m4a
+# Audio mix: voce + musica (musica prolungata per tutta la durata)
+echo "[🎧] Mixa voce + musica..."
+ffmpeg -y -i "$VOCE" -i "$MUSICA" -filter_complex "[1:a]volume=0.2,aloop=loop=-1:size=2e+09[a1];[0:a][a1]amix=inputs=2:duration=longest[aout]" \
+-map "[aout]" -c:a aac -shortest audio_mix.m4a
 
-# Combine video and audio
-echo "[🎬] Generating final short..."
+# Combina audio + video
+echo "[🎬] Creo short finale..."
 ffmpeg -y -i "$VIDEO" -i audio_mix.m4a -c:v copy -c:a aac -shortest "$OUTPUT"
 
-echo "[✅] Done! Your short is ready: $OUTPUT"
+echo "[✅] Fatto! Guarda: $OUTPUT"
 ```
