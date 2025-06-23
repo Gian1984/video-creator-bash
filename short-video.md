@@ -114,7 +114,8 @@ echo "[ℹ️] Trovate $NUM_IMMAGINI immagini."
 
 # Genera voce
 echo "[🎤] Genero voce..."
-python3 -c "from gtts import gTTS; gTTS('$TEXT', lang='it').save('$VOCE')"
+echo "$TEXT" | python3 -c "from gtts import gTTS; import sys; gTTS(sys.stdin.read(), lang='it').save('$VOCE')"
+
 
 # Durata audio (limitata a max 30 sec per YouTube Shorts)
 DURATA=$(ffprobe -i "$VOCE" -show_entries format=duration -v quiet -of csv="p=0")
