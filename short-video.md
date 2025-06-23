@@ -93,7 +93,7 @@ You can change:
 
 source ~/env-tts/bin/activate
 
-TEXT="3 gadget tech da meno di 30 euro che sembrano fantascienza! Trovi il link Amazon in descrizione!"
+TEXT="3 gadget tech da meno di 90 euro che sembrano fantascienza! Cassa Bluetooth Portatile Wild-Mini regalo perfetto per l estate, UGREEN Power Bank Magnetico 1000mAh Compatibile con iPhone , Smart Finder localizzatore di oggetti, mai piu senza chiavi! Trovi il link Amazon in descrizione!"
 VOCE="voce.mp3"
 MUSICA="musica.mp3"
 IMAGES_DIR="./immagini"
